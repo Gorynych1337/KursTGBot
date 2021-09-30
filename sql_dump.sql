@@ -1,0 +1,40 @@
+CREATE TABLE Publishers(
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(50) UNIQUE,
+    country VARCHAR(25)
+);
+CREATE TABLE Developers(
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(50) UNIQUE,
+    country VARCHAR(25)
+);
+CREATE TABLE Games(
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(75) UNIQUE,
+    publisher INTEGER,
+    developer INTEGER,
+    genre VARCHAR(50),
+    FOREIGN KEY(publisher) REFERENCES Publishers(id),
+    FOREIGN KEY(developer) REFERENCES Developers(id)
+);
+CREATE TABLE Keys(
+    key VARCHAR(25) PRIMARY KEY,
+    game INTEGER,
+    platform VARCHAR(50),
+    price INTEGER,
+    FOREIGN KEY(game) REFERENCES Games(id)
+);
+CREATE TABLE Users(
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(50) UNIQUE,
+    password VARCHAR(50),
+    admin_access BOOL
+);
+CREATE TABLE Orders(
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id INTEGER,
+    data timestamptz,
+    key VARCHAR(25),
+    FOREIGN KEY(user_id) REFERENCES Users(id),
+    FOREIGN KEY(key) REFERENCES Keys(key)
+);
