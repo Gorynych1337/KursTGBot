@@ -2,9 +2,11 @@ import os
 import psycopg2
 import telebot
 from telebot import types
+from telebot.apihelper import ApiTelegramException
 from prettytable import PrettyTable
 from math import ceil
 from telegram_bot_pagination import InlineKeyboardPaginator
+from datetime import datetime
 
 
 class WWDB():
@@ -51,7 +53,7 @@ def main():
     TOKEN = os.environ.get('KursTGBot')
     DBWork = WWDB()
     bot = telebot.TeleBot(TOKEN)
-    are_users_admins = dict()
+    users_data = dict()
     page_size = 9
 
     ##########################
@@ -102,7 +104,7 @@ def main():
 
     def for_admin(funk):
         def wrapped(message):
-            if (are_users_admins[message.from_user.id]):
+            if (users_data[message.from_user.id]['is_admin']):
                 funk(message)
             else:
                 bot.send_message(message.chat.id, "У вас нет доступа для такого:(\nПопробуйте другой аккаунт")
@@ -112,11 +114,11 @@ def main():
 
     def is_admin(message):
         try:
-            admin_check = are_users_admins[message.from_user.id]
+            admin_check = users_data[message.from_user.id]['is_admin']
         except KeyError:
             bot.send_message(message.chat.id, "Пожалуйста зарагестрируйсесть или войдите",
                              reply_markup=register_sign_in_inline_KB)
-            raise Exception("This TGuser didn't signed in")
+            raise Exception("This user didn't signed in")
         else:
             return admin_check
 
@@ -181,7 +183,8 @@ def main():
         except:
             bot.send_message(message.chat.id, "Что-то пошло не так. Приносим извинения за неполадки")
         else:
-            are_users_admins[message.from_user.id] = DBWork.select_value('users', 'admin', 'name', login)
+            users_data[message.from_user.id] = {'is_admin': DBWork.select_value('users', 'admin', 'name', login),
+                                                'id': DBWork.select_value('users', 'id', 'name', login)}
             bot.send_message(message.chat.id, "Вы успешно зарегестрированы, выберете таблицу")
             output_table_KB(message)
 
@@ -211,7 +214,8 @@ def main():
         global password
         password = str(message.text)
         if (DBWork.select_value('users', 'password', 'name', login) == password):
-            are_users_admins[message.from_user.id] = DBWork.select_value('users', 'admin', 'name', login)
+            users_data[message.from_user.id] = {'is_admin': DBWork.select_value('users', 'admin', 'name', login),
+                                                'id': DBWork.select_value('users', 'id', 'name', login)}
             bot.send_message(message.chat.id, 'Вход прошёл успешно, выберете таблицу')
             output_table_KB(message)
         else:
@@ -227,26 +231,57 @@ def main():
             bot.send_message(message.chat.id, 'Выберете таблицу', reply_markup=user_tables_KB)
 
     def send_table_to_user(message, table_name, page):
-        tables_output_templates = {
+        tables_output_templates_for_admins = {
             'publishers': ('publishers', 'id, name, country', {}),
             'developers': ('developers', 'id, name, country', {}),
             'games': ('games', 'id, name, publisher, developer, genre',
                       {'publisher': ('publishers', 'name'), 'developer': ('developers', 'name')}),
             'keys': ('keys', 'key, game, platform, price', {'game': ('games', 'name')}),
-            'orders': ('orders', 'id, user_id, data, key', {'user_id': ('users', 'name')}),
+            'orders': ('orders', 'date, key, id, user_id', {'user_id': ('users', 'name')}),
             'users': ('users', 'id, name, admin', {})
         }
-        table, columns, forgein_keys = tables_output_templates[table_name]
+
+        tables_output_templates_for_users = {
+            'publishers': ('publishers', 'name, country', {}),
+            'developers': ('developers', 'name, country', {}),
+            'games': ('games', 'name, publisher, genre',
+                      {'publisher': ('publishers', 'name')}),
+            'orders': ('orders', 'date, key', {})
+        }
+
+        if is_admin(message):
+            table, columns, forgein_keys = tables_output_templates_for_admins[table_name]
+        else:
+            table, columns, forgein_keys = tables_output_templates_for_users[table_name]
 
         head = columns.split(', ')
-        body = DBWork.select_many_rows(table, columns)
 
-
-        for col in forgein_keys:
-            colNum = head.index(col)
+        if table == 'orders':
+            head += ['game', 'platform']
+            if is_admin(message):
+                body = DBWork.select_many_rows(table, columns)
+            else:
+                body = DBWork.select_many_rows(table, columns, 'user_id', users_data[message.from_user.id]['id'])
             for row in body:
+                date = row[0]
+                date_string = datetime(date.year, date.month, date.day, date.hour, date.minute)
+                row[0] = date_string.strftime('%d.%m.%Y')
+                platform = DBWork.select_value('keys', 'platform', 'key', row[1])
+                game = DBWork.select_value('games', 'name', 'id', DBWork.select_value('keys', 'game', 'key', row[1]))
+                row += [game, platform]
+
+        else:
+            body = DBWork.select_many_rows(table, columns)
+        for row in body:
+            for col in forgein_keys:
+                colNum = head.index(col)
                 new_value = DBWork.select_value(forgein_keys[col][0], forgein_keys[col][1])
                 row[colNum] = new_value
+
+        if len(body) == 0:
+            bot.send_message(message.chat.id,
+                             "Данных данных нет на сервере, просим вас подождать несколько дней и повторить запрос")
+            raise Exception('Table "' + table + '" is empty')
 
         pages = ceil(len(body) / page_size)
         if page > pages:
@@ -254,16 +289,11 @@ def main():
 
         tab = PrettyTable(head)
         tab.add_rows(body[page_size * (page - 1):page_size * page])
-        tab.border = False
+        res = '<pre>' + tab.get_string() + '</pre>'
 
-        res = '<pre>'+tab.get_string()+'</pre>'
+        bot.send_message(message.chat.id, res,
+                             reply_markup=tables_paginator(pages, page, table).markup, parse_mode='HTML')
 
-        try:
-            bot.send_message(message.chat.id, res,
-                         reply_markup=tables_paginator(pages, page, table).markup, parse_mode='HTML')
-        except:
-            bot.send_message(message.chat.id, "Что-то пошло не так. Приносим извинения за неполадки")
-            raise Exception('Table "'+table+'" is empty')
 
     ##########################
     # --Commands For Admins--#
@@ -282,7 +312,7 @@ def main():
     @bot.message_handler(content_types='text')
     def raw_text_message(message):
         if message.text in ('Publishers', 'Developers', 'Games', 'Keys', 'Orders', 'Users'):
-            send_table_to_user(message, message.text.lower(), 1)
+            send_table_to_user(message, message.text.lower(), page=1)
         else:
             bot.send_message(message.chat.id, "Я не знаю такого, простите")
 

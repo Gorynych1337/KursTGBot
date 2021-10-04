@@ -124,5 +124,6 @@ dmypy.json
 .idea/
 srtip.py
 
-# another git projects
+# anothers
 /pyTelegramBotApi
+SQLtest.py
