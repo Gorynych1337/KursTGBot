@@ -28,12 +28,12 @@ CREATE TABLE Users(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name VARCHAR(50) UNIQUE,
     password VARCHAR(50),
-    admin_access BOOL
+    is_admin BOOL
 );
 CREATE TABLE Orders(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_id INTEGER,
-    data timestamptz,
+    date timestamptz,
     key VARCHAR(25),
     FOREIGN KEY(user_id) REFERENCES Users(id),
     FOREIGN KEY(key) REFERENCES Keys(key)
