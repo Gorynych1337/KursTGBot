@@ -14,15 +14,19 @@ CREATE TABLE Games(
     publisher INTEGER,
     developer INTEGER,
     genre VARCHAR(50),
-    FOREIGN KEY(publisher) REFERENCES Publishers(id),
-    FOREIGN KEY(developer) REFERENCES Developers(id)
+    year INTEGER,
+    description VARCHAR,
+    FOREIGN KEY(publisher) REFERENCES Publishers(id) ON UPDATE CASCADE ON DELETE NO ACTION,
+    FOREIGN KEY(developer) REFERENCES Developers(id) ON UPDATE CASCADE ON DELETE NO ACTION
 );
 CREATE TABLE Keys(
-    key VARCHAR(25) PRIMARY KEY,
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    key VARCHAR(25) UNIQUE,
     game INTEGER,
     platform VARCHAR(50),
     price INTEGER,
-    FOREIGN KEY(game) REFERENCES Games(id)
+    purchased BOOL,
+    FOREIGN KEY(game) REFERENCES Games(id) ON UPDATE CASCADE ON DELETE NO ACTION
 );
 CREATE TABLE Users(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -32,9 +36,9 @@ CREATE TABLE Users(
 );
 CREATE TABLE Orders(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    user_id INTEGER,
-    date timestamptz,
-    key VARCHAR(25),
-    FOREIGN KEY(user_id) REFERENCES Users(id),
-    FOREIGN KEY(key) REFERENCES Keys(key)
+    buyer INTEGER,
+    date timestamptz default now(),
+    key INTEGER,
+    FOREIGN KEY(buyer) REFERENCES Users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY(key) REFERENCES Keys(id) ON UPDATE CASCADE ON DELETE NO ACTION
 );

@@ -40,7 +40,16 @@ class WWDB():
         row = list(self.curs.fetchone())
         return row
 
-    def select_value(self, table, column, key, key_value):
+    def select_many_values(self, table, column, key, key_value):
+        select_value_command = f"select {column} from {table} where {key} = '{key_value}'"
+        self.curs.execute(select_value_command)
+        raw_rows = self.curs.fetchall()
+        values = []
+        for row in raw_rows:
+            values.append(row[0])
+        return values
+
+    def select_one_value(self, table, column, key, key_value):
         select_value_command = f"select {column} from {table} where {key} = '{key_value}'"
         self.curs.execute(select_value_command)
         value = self.curs.fetchone()[0]
@@ -51,6 +60,19 @@ class WWDB():
         insert_command = self.curs.mogrify(insert_command_string, values)
         try:
             self.curs.execute(insert_command)
+            self.conn.commit()
+        except:
+            self.conn.rollback()
+
+    def update(self, table, columns, values, key, key_value):
+        column_value_ratio_string = ''
+        for i in range(len(columns)-1):
+            column_value_ratio_string += f"{columns[i]} = '{values[i]}',"
+        column_value_ratio_string += f"{columns[-1]} = '{values[-1]}'"
+        update_command_string = f"update {table} set {column_value_ratio_string} where {key} = '{key_value}'"
+        update_command = self.curs.mogrify(update_command_string)
+        try:
+            self.curs.execute(update_command)
             self.conn.commit()
         except:
             self.conn.rollback()
