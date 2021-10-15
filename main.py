@@ -8,9 +8,9 @@ from datetime import datetime
 
 
 def main():
-    TOKEN = os.environ.get('KursTGBot')
-    bot = telebot.TeleBot(TOKEN)
-    DBWork = WWDB()
+    token = os.environ.get('CourseTGBot')
+    bot = telebot.TeleBot(token)
+    dbwork = WWDB()
 
     users_data = dict()
     tables = ('Publishers', 'Developers', 'Games', 'Keys', 'Orders', 'Users')
@@ -40,7 +40,7 @@ def main():
     def exit_check(funk):
         def wrapped(message):
             if (message.text == '/exit'):
-                bot.send_message(message.chat.id, 'Операция прервана', reply_markup=start_KB)
+                bot.send_message(message.chat.id, 'Операция прервана', reply_markup=start_kb)
                 raise Exception('Quit from function, all is OK')
             funk(message)
 
@@ -51,16 +51,16 @@ def main():
             admin_check = users_data[user_id]['is_admin']
         except KeyError:
             bot.send_message(chat_id, 'Пожалуйста зарагестрируйсесть или войдите',
-                             reply_markup=register_sign_in_inline_KB)
+                             reply_markup=register_sign_in_inline_kb)
             raise Exception("This user didn't signed in")
         else:
             return admin_check
 
-    def output_tables_KB(user_id, chat_id):
+    def output_tables_kb(user_id, chat_id):
         if is_admin(user_id, chat_id):
-            bot.send_message(chat_id, 'Выберете таблицу', reply_markup=admin_tables_KB)
+            bot.send_message(chat_id, 'Выберете таблицу', reply_markup=admin_tables_kb)
         else:
-            bot.send_message(chat_id, 'Выберете таблицу', reply_markup=user_tables_KB)
+            bot.send_message(chat_id, 'Выберете таблицу', reply_markup=user_tables_kb)
 
     def timestampz_to_string(timestamp_date_time, date_or_datetime):
         date_string = datetime(timestamp_date_time.year, timestamp_date_time.month, timestamp_date_time.day,
@@ -74,7 +74,8 @@ def main():
         return res_string
 
     def pay_the_game():
-        return 'Подключить оплату в этого бота я не могу, потому что это будет мошенничество, но заказ на ваш аккаунт добавить можно'
+        return 'Подключить оплату в этого бота я не могу, потому что это будет мошенничество, но заказ на ваш аккаунт' \
+               'добавить можно'
 
     def for_admin(funk):
         def wrapped(message):
@@ -83,6 +84,7 @@ def main():
             else:
                 bot.send_message(message.chat.id, 'У вас нет доступа для такого:(\nПопробуйте другой аккаунт')
                 raise Exception('This command not for common users')
+
         return wrapped
 
     ##########################
@@ -92,7 +94,7 @@ def main():
     @bot.message_handler(commands=['start'])
     def start(message):
         bot.send_message(message.chat.id, 'Привет, для регистрации или входа нажмите на кнопку',
-                         reply_markup=register_sign_in_inline_KB)
+                         reply_markup=register_sign_in_inline_kb)
 
     @bot.message_handler(commands=['help'])
     def help_message(message):
@@ -101,7 +103,7 @@ def main():
     # ветка регистрации
     @bot.callback_query_handler(func=lambda call: call.data == 'register')
     def start_register(call):
-        bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_KB)
+        bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_kb)
         bot.register_next_step_handler(call.message, get_register_login)
 
     @exit_check
@@ -109,7 +111,7 @@ def main():
         global login
         login = str(message.text)
         try:
-            DBWork.select_one_value('users', 'id', key='name', key_value=login)
+            dbwork.select_one_value('users', 'id', key='name', key_value=login)
         except:
             bot.send_message(message.chat.id, 'Придумайте пароль')
             bot.register_next_step_handler(message, get_register_password)
@@ -123,60 +125,60 @@ def main():
         password = str(message.text)
         try:
             register_data = (login, password)
-            DBWork.insert('users', 'name, password', register_data)
+            dbwork.insert('users', 'name, password', register_data)
         except:
             bot.send_message(message.chat.id, 'Что-то пошло не так. Приносим извинения за неполадки')
         else:
-            users_data[message.from_user.id] = {'is_admin': DBWork.select_one_value('users', 'is_admin', 'name', login),
-                                                'id': DBWork.select_one_value('users', 'id', 'name', login)}
+            users_data[message.from_user.id] = {'is_admin': dbwork.select_one_value('users', 'is_admin', 'name', login),
+                                                'id': dbwork.select_one_value('users', 'id', 'name', login)}
             bot.send_message(message.chat.id, 'Вы успешно зарегестрированы')
-            output_tables_KB(message.from_user.id, message.chat.id)
+            output_tables_kb(message.from_user.id, message.chat.id)
 
     # ветка входа
-    @bot.callback_query_handler(func=lambda call: call.data == 'signin')
-    def start_signin(call):
-        bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_KB)
-        bot.register_next_step_handler(call.message, get_signin_login)
+    @bot.callback_query_handler(func=lambda call: call.data == 'sign_in')
+    def start_sign_in(call):
+        bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_kb)
+        bot.register_next_step_handler(call.message, get_sign_in_login)
 
     @exit_check
-    def get_signin_login(message):
+    def get_sign_in_login(message):
         global login
         login = str(message.text)
         try:
-            DBWork.select_one_value('users', 'id', key='name', key_value=login)
+            dbwork.select_one_value('users', 'id', key='name', key_value=login)
         except:
             bot.send_message(message.chat.id,
                              'Такого лоигна не существует, попробуйте ввести другой или зарегестрироваться')
-            bot.register_next_step_handler(message, get_signin_login)
+            bot.register_next_step_handler(message, get_sign_in_login)
         else:
             bot.send_message(message.chat.id, 'Введите пароль')
-            bot.register_next_step_handler(message, get_signin_password)
+            bot.register_next_step_handler(message, get_sign_in_password)
 
     @exit_check
-    def get_signin_password(message):
+    def get_sign_in_password(message):
         global password
         password = str(message.text)
-        if (DBWork.select_one_value('users', 'password', 'name', login) == password):
-            users_data[message.from_user.id] = {'is_admin': DBWork.select_one_value('users', 'is_admin', 'name', login),
-                                                'id': DBWork.select_one_value('users', 'id', 'name', login)}
+        if (dbwork.select_one_value('users', 'password', 'name', login) == password):
+            users_data[message.from_user.id] = {'is_admin': dbwork.select_one_value('users', 'is_admin', 'name', login),
+                                                'id': dbwork.select_one_value('users', 'id', 'name', login)}
             bot.send_message(message.chat.id, 'Вход прошёл успешно')
-            output_tables_KB(message.from_user.id, message.chat.id)
+            output_tables_kb(message.from_user.id, message.chat.id)
         else:
             bot.send_message(message.chat.id, 'Пароль неверный, попробуйте снова')
-            bot.register_next_step_handler(message, get_signin_password)
+            bot.register_next_step_handler(message, get_sign_in_password)
 
     # Вывод доступных таблиц
     @bot.message_handler(commands=['tables'])
-    def output_tables_KB_by_message(message):
-        output_tables_KB(message.from_user.id, message.chat.id)
+    def output_tables_kb_by_message(message):
+        output_tables_kb(message.from_user.id, message.chat.id)
 
     @bot.message_handler(func=lambda message: message.text in tables)
     def send_table_to_user(message, page=1):
         # Получение необходимых данных для обращения  БД
         if is_admin(message.from_user.id, message.chat.id):
-            table, columns, order_by, forgein_keys = tables_output_data_for_admins[message.text]
+            table, columns, order_by, foreign_keys = tables_output_data_for_admins[message.text]
         else:
-            table, columns, order_by, forgein_keys = tables_output_data_for_users[message.text]
+            table, columns, order_by, foreign_keys = tables_output_data_for_users[message.text]
 
         # Заголовок таблицы
         head = columns.split(', ')
@@ -185,40 +187,39 @@ def main():
 
         # Получение всех данных данных из бд для тела таблицы
         if table == 'orders' and not is_admin(message.from_user.id, message.chat.id):
-            body = DBWork.select_many_rows(table, columns, key='buyer',
+            body = dbwork.select_many_rows(table, columns, key='buyer',
                                            key_value=users_data[message.from_user.id]['id'],
                                            order_by=order_by)
             # Проверка на существование данных
             if len(body) == 0:
                 bot.send_message(message.chat.id, 'У вас нет заказов, нужно это исправить',
-                                 reply_markup=make_order_inline_KB)
+                                 reply_markup=make_order_inline_kb)
                 return
         else:
-            body = DBWork.select_many_rows(table, columns, order_by=order_by)
+            body = dbwork.select_many_rows(table, columns, order_by=order_by)
             empty_body_message = 'Данных нет на сервере просим вас подождать до обновления сервера'
             # Проверка на существование данных
             if len(body) == 0:
                 bot.send_message(message.chat.id, empty_body_message)
                 raise Exception("Table '' + table + ' is empty or dont have needed entries")
 
-
         # Обработка данных из тела таблицы
         for row in body:
             if table == 'orders':
                 if is_admin(message.from_user.id, message.chat.id):
                     row[1] = timestampz_to_string(row[1], 'date')
-                key_id = DBWork.select_one_value('orders', 'key', 'id', row[0])
+                key_id = dbwork.select_one_value('orders', 'key', 'id', row[0])
 
-                platform = DBWork.select_one_value('keys', 'platform', 'id', key_id)
+                platform = dbwork.select_one_value('keys', 'platform', 'id', key_id)
 
-                game_id = DBWork.select_one_value('keys', 'game', 'id', key_id)
-                game = DBWork.select_one_value('games', 'name', 'id', game_id)
+                game_id = dbwork.select_one_value('keys', 'game', 'id', key_id)
+                game = dbwork.select_one_value('games', 'name', 'id', game_id)
 
                 row += [game, platform]
-            for col in forgein_keys:
+            for col in foreign_keys:
                 colNum = head.index(col)
-                new_value = DBWork.select_one_value(forgein_keys[col][0], forgein_keys[col][2], forgein_keys[col][1],
-                                                row[colNum])
+                new_value = dbwork.select_one_value(foreign_keys[col][0], foreign_keys[col][2], foreign_keys[col][1],
+                                                    row[colNum])
                 row[colNum] = new_value
 
         # Рассчёт страниц для пагинатора
@@ -253,16 +254,16 @@ def main():
         )
         send_table_to_user(call.message, page)
 
-    @bot.callback_query_handler(func= lambda call: call.data == 'make_order')
+    @bot.callback_query_handler(func=lambda call: call.data == 'make_order')
     def start_make_order_by_callback(call):
         is_admin(call.from_user.id, call.message.chat.id)
-        bot.send_message(call.message.chat.id, 'Введите название игры для покупки', reply_markup=exit_KB)
+        bot.send_message(call.message.chat.id, 'Введите название игры для покупки', reply_markup=exit_kb)
         bot.register_next_step_handler(call.message, get_game_name)
 
     @bot.message_handler(commands=['make_order'])
     def start_make_order_by_command(message):
         is_admin(message.from_user.id, message.chat.id)
-        bot.send_message(message.chat.id, 'Введите название игры для покупки', reply_markup=exit_KB)
+        bot.send_message(message.chat.id, 'Введите название игры для покупки', reply_markup=exit_kb)
         bot.register_next_step_handler(message, get_game_name)
 
     @exit_check
@@ -270,18 +271,18 @@ def main():
         global user_id
         user_id = message.from_user.id
         try:
-            game_id = DBWork.select_one_value('games', 'id', key='name', key_value=message.text)
+            game_id = dbwork.select_one_value('games', 'id', key='name', key_value=message.text)
         except:
             bot.send_message(message.chat.id,
                              'Такой игры не существует, перепроверьте правильность написания')
             bot.register_next_step_handler(message, get_game_name)
         else:
             try:
-                keys = DBWork.select_many_rows('keys', key='game', key_value=game_id)
+                keys = dbwork.select_many_rows('keys', key='game', key_value=game_id)
                 global not_purchased_keys
                 not_purchased_keys = {}
                 for key in keys:
-                    if key[5] == False:
+                    if not key[5]:
                         not_purchased_keys[key[0]] = key[3]
                 if len(not_purchased_keys) == 0:
                     raise Exception('There is no needed game-keys')
@@ -289,29 +290,30 @@ def main():
                 bot.send_message(message.chat.id, 'К сожалению, ключи закончились, а новые ещё не куплены.'
                                                   'Попробуйте совершить покупку позже')
             else:
-                platforms_inline_KB = make_inline_KB('platform', list(set(not_purchased_keys.values())))
-                bot.send_message(message.chat.id, 'Выберете одну из следующих платформ', reply_markup=platforms_inline_KB)
+                platforms_inline_kb = make_inline_kb('platform', list(set(not_purchased_keys.values())))
+                bot.send_message(message.chat.id, 'Выберете одну из следующих платформ',
+                                 reply_markup=platforms_inline_kb)
 
     @bot.callback_query_handler(func=lambda call: call.data.split('-')[0] == 'platform')
     def get_game_platform(call):
         try:
             platform = call.data.split('-')[1]
             key_id = list(not_purchased_keys.keys())[list(not_purchased_keys.values()).index(platform)]
-            DBWork.update('keys', ['purchased'], ['true'], 'id', key_id)
-            DBWork.insert('orders', 'buyer, key', [users_data[user_id]['id'], key_id])
+            dbwork.update('keys', ['purchased'], ['true'], 'id', key_id)
+            dbwork.insert('orders', 'buyer, key', [users_data[user_id]['id'], key_id])
         except:
-            bot.send_message(call.message.chat.id, 'При оформлении заказа произошла ошибка, попробуйте сделать запрос позже')
-            output_tables_KB(call.from_user.id, call.message.chat.id)
+            bot.send_message(call.message.chat.id,
+                             'При оформлении заказа произошла ошибка, попробуйте сделать запрос позже')
+            output_tables_kb(call.from_user.id, call.message.chat.id)
         else:
             text = pay_the_game()
             bot.send_message(call.message.chat.id, text)
-            output_tables_KB(call.from_user.id, call.message.chat.id)
+            output_tables_kb(call.from_user.id, call.message.chat.id)
 
     # ---Raw text handler----#
     @bot.message_handler(content_types='text')
     def raw_text_message(message):
         bot.send_message(message.chat.id, 'Я не знаю такого, простите')
-
 
     bot.infinity_polling()
 
