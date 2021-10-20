@@ -1,7 +1,7 @@
 import os
+import telebot
 from WorkWithDB import WWDB
 from keyboards import *
-import telebot
 from prettytable import PrettyTable
 from math import ceil
 from datetime import datetime
@@ -10,11 +10,16 @@ from datetime import datetime
 def main():
     token = os.environ.get('CourseTGBot')
     bot = telebot.TeleBot(token)
-    dbwork = WWDB()
+    dbwork = WWDB(user='postgres',
+                  password='admin123',
+                  host='localhost',
+                  port='5432',
+                  database='GameShop')
 
     users_data = dict()
     tables = ('Publishers', 'Developers', 'Games', 'Keys', 'Orders', 'Users')
     page_size = 5
+    change_types = ('Insert', 'Update', 'Delete')
 
     tables_output_data_for_admins = {
         'Publishers': ('publishers', 'id, name, country', 'id', {}),
@@ -33,16 +38,40 @@ def main():
         'Orders': ('orders', 'id', 'id', {})
     }
 
+    insert_data = {
+        'publishers': ('Название, страна', {}, 'name, country'),
+        'developers': ('Название, страна', {}, 'name, country'),
+        'games': ('Название, издатель, разработчик, жанр, год выпуска',
+                  {1: ('publishers', 'id', 'name'), 2: ('developers', 'id', 'name')},
+                  'name, publisher, developer, genre, year, description'),
+        'keys': ('Ключ, игра, платформа, цена', {1: ('games', 'id', 'name')},
+                 'key, game, platform, price')
+    }
+    update_data = {
+        'publishers': {'name': 'string', 'country': 'string'},
+        'developers': {'name': 'string', 'country': 'string'},
+        'games': {'name': 'string', 'publisher': 'id', 'developer': 'id', 'genre': 'string', 'year': 'int',
+                  'description': 'big string'},
+        'keys': {'key': 'string', 'game': 'id', 'platform': 'string', 'price': 'int', 'purchased': 'bool'},
+        'users': {'name': 'string', 'password': 'string', 'is_admin': 'bool'}
+    }
+    rules = {
+        'id': '\n•столбец {} является id записи в соответствующей таблице',
+        'boll': '\n•столбец {} имеет только занечения true или false',
+        'date': '\n•столбец {} имеет формат "год.месяц.день час:минута"',
+        'big string': '\n•столбец {} вводится отдельно'
+    }
+
     ##########################
-    # ------Helps Funks------#
+    # ------Helps Funcs------#
     ##########################
 
-    def exit_check(funk):
+    def exit_check(func):
         def wrapped(message):
             if (message.text == '/exit'):
                 bot.send_message(message.chat.id, 'Операция прервана', reply_markup=start_kb)
                 raise Exception('Quit from function, all is OK')
-            funk(message)
+            func(message)
 
         return wrapped
 
@@ -62,9 +91,9 @@ def main():
         else:
             bot.send_message(chat_id, 'Выберете таблицу', reply_markup=user_tables_kb)
 
-    def timestampz_to_string(timestamp_date_time, date_or_datetime):
-        date_string = datetime(timestamp_date_time.year, timestamp_date_time.month, timestamp_date_time.day,
-                               timestamp_date_time.hour, timestamp_date_time.minute)
+    def datetime_to_string(date_time, date_or_datetime):
+        date_string = datetime(date_time.year, date_time.month, date_time.day,
+                               date_time.hour, date_time.minute)
         if date_or_datetime == 'date':
             res_string = date_string.strftime('%d.%m.%Y')
         elif date_or_datetime == 'datetime':
@@ -77,15 +106,29 @@ def main():
         return 'Подключить оплату в этого бота я не могу, потому что это будет мошенничество, но заказ на ваш аккаунт' \
                'добавить можно'
 
-    def for_admin(funk):
-        def wrapped(message):
-            if (users_data[message.from_user.id]['is_admin']):
-                funk(message)
+    def for_admin(func):
+        def wrapped(data):
+            try:
+                chat_id = data.chat.id
+            except:
+                chat_id = data.message.chat.id
+            if is_admin(data.from_user.id, chat_id):
+                func(data)
             else:
-                bot.send_message(message.chat.id, 'У вас нет доступа для такого:(\nПопробуйте другой аккаунт')
+                bot.send_message(chat_id, 'У вас нет доступа для такого:(\nПопробуйте другой аккаунт')
                 raise Exception('This command not for common users')
 
         return wrapped
+
+    def string_datetime_to_datetime(string, date_or_datetime):
+        dttime = datetime()
+        if date_or_datetime == 'date':
+            dttime.year, dttime.month, dttime.day = string.split('.')
+        elif date_or_datetime == 'datetime':
+            date, time = string.split(' ')
+            dttime.year, dttime.month, dttime.day = date.split('.')
+            dttime.hour, dttime.minute = time.splite(':')
+        return dttime
 
     ##########################
     # -------Commands--------#
@@ -104,7 +147,7 @@ def main():
     @bot.callback_query_handler(func=lambda call: call.data == 'register')
     def start_register(call):
         bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_kb)
-        bot.register_next_step_handler(call.message, get_register_login)
+        bot.register_next_step_handler_by_chat_id(call.message.chat.id, get_register_login)
 
     @exit_check
     def get_register_login(message):
@@ -114,10 +157,10 @@ def main():
             dbwork.select_one_value('users', 'id', key='name', key_value=login)
         except:
             bot.send_message(message.chat.id, 'Придумайте пароль')
-            bot.register_next_step_handler(message, get_register_password)
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_register_password)
         else:
             bot.send_message(message.chat.id, 'Такой логин уже существует, выберете другой')
-            bot.register_next_step_handler(message, get_register_login)
+            bot.register_next_step_handler_by_chat_id(message.char.id, get_register_login)
 
     @exit_check
     def get_register_password(message):
@@ -138,7 +181,7 @@ def main():
     @bot.callback_query_handler(func=lambda call: call.data == 'sign_in')
     def start_sign_in(call):
         bot.send_message(call.message.chat.id, 'Введите лоигн', reply_markup=exit_kb)
-        bot.register_next_step_handler(call.message, get_sign_in_login)
+        bot.register_next_step_handler_by_chat_id(call.message.chat.id, get_sign_in_login)
 
     @exit_check
     def get_sign_in_login(message):
@@ -149,10 +192,10 @@ def main():
         except:
             bot.send_message(message.chat.id,
                              'Такого лоигна не существует, попробуйте ввести другой или зарегестрироваться')
-            bot.register_next_step_handler(message, get_sign_in_login)
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_sign_in_login)
         else:
             bot.send_message(message.chat.id, 'Введите пароль')
-            bot.register_next_step_handler(message, get_sign_in_password)
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_sign_in_password)
 
     @exit_check
     def get_sign_in_password(message):
@@ -165,7 +208,7 @@ def main():
             output_tables_kb(message.from_user.id, message.chat.id)
         else:
             bot.send_message(message.chat.id, 'Пароль неверный, попробуйте снова')
-            bot.register_next_step_handler(message, get_sign_in_password)
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_sign_in_password)
 
     # Вывод доступных таблиц
     @bot.message_handler(commands=['tables'])
@@ -207,7 +250,7 @@ def main():
         for row in body:
             if table == 'orders':
                 if is_admin(message.from_user.id, message.chat.id):
-                    row[1] = timestampz_to_string(row[1], 'date')
+                    row[1] = datetime_to_string(row[1], 'date')
                 key_id = dbwork.select_one_value('orders', 'key', 'id', row[0])
 
                 platform = dbwork.select_one_value('keys', 'platform', 'id', key_id)
@@ -218,8 +261,8 @@ def main():
                 row += [game, platform]
             for col in foreign_keys:
                 colNum = head.index(col)
-                new_value = dbwork.select_one_value(foreign_keys[col][0], foreign_keys[col][2], foreign_keys[col][1],
-                                                    row[colNum])
+                new_value = dbwork.select_one_value(foreign_keys[col][0], foreign_keys[col][2],
+                                                    foreign_keys[col][1], row[colNum])
                 row[colNum] = new_value
 
         # Рассчёт страниц для пагинатора
@@ -230,13 +273,37 @@ def main():
         # Добавление данних из нужного промежутка на страницу
         tab = PrettyTable(head)
         tab.add_rows(body[page_size * (page - 1):page_size * page])
+        tab.border = False
         res = '<pre>' + tab.get_string() + '</pre>'
 
         paginator = tables_paginator(pages, page, table)
-        if table == 'orders':
-            paginator.add_after(make_order_inline_btn)
+
+        # Добавление клавиатур к пагинатору
+        insert_btn, update_btn, delete_btn = make_change_db_inline_btns(table)
+        if table == 'developers':
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(insert_btn, update_btn, delete_btn)
+
+        elif table == 'publishers':
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(insert_btn, update_btn, delete_btn)
+
         elif table == 'games':
-            paginator.add_after(make_order_inline_btn)
+            paginator.add_before(make_order_inline_btn)
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(insert_btn, update_btn, delete_btn)
+
+        elif table == 'keys':
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(insert_btn, update_btn, delete_btn)
+
+        elif table == 'users':
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(update_btn, delete_btn)
+
+        elif table == 'orders':
+            if is_admin(message.from_user.id, message.chat.id):
+                paginator.add_after(update_btn, delete_btn)
 
         # Отправка сообщения
         bot.send_message(message.chat.id, res,
@@ -258,13 +325,13 @@ def main():
     def start_make_order_by_callback(call):
         is_admin(call.from_user.id, call.message.chat.id)
         bot.send_message(call.message.chat.id, 'Введите название игры для покупки', reply_markup=exit_kb)
-        bot.register_next_step_handler(call.message, get_game_name)
+        bot.register_next_step_handler_by_chat_id(call.message.chat.id, get_game_name)
 
     @bot.message_handler(commands=['make_order'])
     def start_make_order_by_command(message):
         is_admin(message.from_user.id, message.chat.id)
         bot.send_message(message.chat.id, 'Введите название игры для покупки', reply_markup=exit_kb)
-        bot.register_next_step_handler(message, get_game_name)
+        bot.register_next_step_handler_by_chat_id(message.chat.id, get_game_name)
 
     @exit_check
     def get_game_name(message):
@@ -275,7 +342,7 @@ def main():
         except:
             bot.send_message(message.chat.id,
                              'Такой игры не существует, перепроверьте правильность написания')
-            bot.register_next_step_handler(message, get_game_name)
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_game_name)
         else:
             try:
                 keys = dbwork.select_many_rows('keys', key='game', key_value=game_id)
@@ -310,8 +377,143 @@ def main():
             bot.send_message(call.message.chat.id, text)
             output_tables_kb(call.from_user.id, call.message.chat.id)
 
-    # ---Raw text handler----#
-    @bot.message_handler(content_types='text')
+    # Цепочка работы сданными в БД для администраторов
+    @bot.message_handler(commands=['change'])
+    @for_admin
+    def start_change_db_by_message(message):
+        bot.send_message(message.chat.id, 'Выберете таблицу для изменения', reply_markup=admin_tables_kb)
+
+    @bot.callback_query_handler(func=lambda call: call.data.split('-')[0] in change_types)
+    @for_admin
+    def start_change_db_by_callback(call):
+        global table
+        table = call.data.split('-')[1]
+        callback_change_type = call.data.split('-')[0]
+        if callback_change_type == 'Insert':
+            bot.send_message(call.message.chat.id,
+                             'Введите через запятую значения следующих параметров для добавления:\n' +
+                             insert_data[table][0])
+            bot.register_next_step_handler_by_chat_id(call.message.chat.id, get_insert_values)
+
+        elif callback_change_type == 'Update':
+            bot.send_message(call.message.chat.id, 'Введите id записи, которую небходимо изменить')
+            bot.register_next_step_handler_by_chat_id(call.message.chat.id, get_update_entry_id)
+
+        elif callback_change_type == 'Delete':
+            bot.register_next_step_handler_by_chat_id(call.message.chat.id, start_delete_from_db)
+
+    # Ветка добавления новых данных в БД
+    @exit_check
+    def get_insert_values(message):
+        global insert_input_data
+        insert_input_data = message.text.split(', ')
+        if len(insert_input_data) != len(insert_data[table][0].split(', ')):
+            bot.send_message(message.chat.id, 'Введённые данные не соответсвуют количеству колонок')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_insert_values)
+
+        names_instead_ids = insert_data[table][1]
+        for col in names_instead_ids.keys():
+            insert_input_data[col] = dbwork.select_one_value(names_instead_ids[col][0], names_instead_ids[col][1],
+                                                      names_instead_ids[col][2], insert_input_data[col])
+        if table == 'games':
+            bot.send_message(message.chat.id, 'Введите описание для игры')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_insert_game_description)
+        else:
+            end_insert_db(message.chat.id)
+
+    def get_insert_game_description(message):
+        insert_input_data.append(message.text)
+        end_insert_db(message.chat.id)
+
+    def end_insert_db(chat_id):
+        try:
+            col = insert_data[table][2]
+            dbwork.insert(table, col, insert_input_data)
+        except:
+            bot.send_message(chat_id, 'Что-то пошло не так, повторите запрос позже')
+        else:
+            bot.send_message(chat_id, 'Данные успешно добавлены')
+
+    # Ветка изменения данных в БД
+    @exit_check
+    def get_update_entry_id(message):
+        try:
+            dbwork.select_one_row(table, 'id', message.text)
+        except:
+            bot.send_message(message.chat.id, 'Такого id не существует, перепроверьте данные')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_update_entry_id)
+        else:
+            global update_id
+            update_id = message.text
+            columns = update_data[table].keys()
+            bot.send_message(message.chat.id, 'Введите через запятую колонки, которые необходимо изменить:\n' +
+                             ', '.join(columns))
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_update_columns)
+
+    @exit_check
+    def get_update_columns(message):
+        global update_columns
+        update_columns = message.text.split(', ')
+        additional_rules = ''
+        for column in update_columns:
+            try:
+                update_data[table][column]
+            except:
+                bot.send_message(message.chat.id, 'Введённые данные не соответсвуют колонкам выбранной таблицы,'
+                                                  'попробуйте ввести необходимые колонки вновь')
+                bot.register_next_step_handler_by_chat_id(message.chat.id, get_update_columns)
+            else:
+                if update_data[table][column] != 'string' and update_data[table][column] != 'int':
+                    additional_rules += rules[update_data[table][column]].format(column)
+                    if update_data[table][column] == 'big string':
+                        global description_exist
+                        description_exist = True
+                        update_columns.remove(column)
+        if additional_rules != '':
+            additional_rules = '\n\nТак же обратите внимание, что:' + additional_rules
+        bot.send_message(message.chat.id, 'Введите новые данные для записи'+additional_rules)
+        bot.register_next_step_handler_by_chat_id(message.chat.id, get_new_update_data)
+
+    @exit_check
+    def get_new_update_data(message):
+        global update_input_data
+        update_input_data = message.text.split(', ')
+        if len(update_input_data) != len(update_columns):
+            bot.send_message(message.chat.id, 'Введённые данные не соответсвуют количеству колонок')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_new_update_data)
+        for i in range(len(update_input_data)):
+            if update_data[table][update_columns[i]] == 'id':
+                try:
+                    dbwork.select_one_row(table, update_columns[i], update_input_data[i])
+                except:
+                    bot.send_message(message.chat.id, 'Введённые id не существуют, перепроверьте и повторите запрос')
+                    bot.register_next_step_handler_by_chat_id(message.chat.id, get_new_update_data)
+        if description_exist:
+            bot.send_message(message.chat.id, 'Введите описание игры')
+            bot.register_next_step_handler_by_chat_id(message.chat.id, get_update_game_description)
+        else:
+            end_update_db(message.chat.id)
+
+    def get_update_game_description(message):
+        update_columns.append('description')
+        update_input_data.append(message.text)
+        end_update_db(message.chat.id)
+
+    def end_update_db(chat_id):
+        try:
+            dbwork.update(table, update_columns, update_input_data, 'id', update_id)
+        except:
+            bot.send_message(chat_id, 'Что-то пошло не так, повторите запрос позже')
+        else:
+            bot.send_message(chat_id, 'Данные успешно добавлены')
+
+    # Ветка удаления данных из БД
+    def start_delete_from_db(message):
+        bot.send_message(message.chat.id, table)
+
+    # Обработчик для неизвестных сообщений
+    @bot.message_handler(func=lambda message: True, content_types=['audio', 'photo', 'voice', 'video', 'document',
+                                                                   'text', 'location', 'contact', 'sticker'])
     def raw_text_message(message):
         bot.send_message(message.chat.id, 'Я не знаю такого, простите')
 

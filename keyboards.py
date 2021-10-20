@@ -55,3 +55,10 @@ def make_inline_kb(kb_name, btns_names_array):
         btn = (types.InlineKeyboardButton(btn_text, callback_data=btn_callback))
         inline_kb.add(btn)
     return inline_kb
+
+
+def make_change_db_inline_btns(table):
+    insert_inline_btn = types.InlineKeyboardButton('Добавить', callback_data=f'Insert-{table}')
+    update_inline_btn = types.InlineKeyboardButton('Изменть', callback_data=f'Update-{table}')
+    delete_inline_btn = types.InlineKeyboardButton('Удалить', callback_data=f'Delete-{table}')
+    return insert_inline_btn, update_inline_btn, delete_inline_btn

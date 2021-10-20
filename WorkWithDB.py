@@ -1,12 +1,12 @@
 import psycopg2
 
 class WWDB():
-    def __init__(self):  # метод чтения БД и создания курсора
-        self.conn = psycopg2.connect(user='postgres',
-                                     password='admin123',
-                                     host='localhost',
-                                     port='5432',
-                                     database='GameShop')
+    def __init__(self, user, password, host, port, database):  # метод чтения БД и создания курсора
+        self.conn = psycopg2.connect(user=user,
+                                     password=password,
+                                     host=host,
+                                     port=port,
+                                     database=database)
         self.curs = self.conn.cursor()  # курсор
 
     def select_many_rows(self, table, columns=('*'), **kwargs):
@@ -63,6 +63,7 @@ class WWDB():
             self.conn.commit()
         except:
             self.conn.rollback()
+            raise Exception('Insert was non successful')
 
     def update(self, table, columns, values, key, key_value):
         column_value_ratio_string = ''
@@ -76,3 +77,4 @@ class WWDB():
             self.conn.commit()
         except:
             self.conn.rollback()
+            raise Exception('Update was non successful')
