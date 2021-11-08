@@ -64,14 +64,15 @@ class WWDB:
         insert_command = self.curs.mogrify(insert_command_string, values)
         try:
             self.curs.execute(insert_command)
-            result = self.curs.fetchone()[0]
             self.conn.commit()
-            return result
+            if 'returning' in kwargs:
+                result = self.curs.fetchone()[0]
+                return result
         except:
             self.conn.rollback()
             raise Exception('Insert was non successful')
 
-    def update(self, table, columns, values, key, key_value, crypt_columns=None):
+    def update(self, table, columns, values, key, key_value, crypt_columns=[None]):
         column_value_ratio_string = ''
         for i in range(len(columns)):
             values[i] = f"'{values[i]}'"

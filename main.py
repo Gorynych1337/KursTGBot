@@ -52,7 +52,7 @@ def main():
         'developers': {'name': 'string', 'country': 'string'},
         'games': {'name': 'string', 'publisher': 'id', 'developer': 'id', 'genre': 'string', 'year': 'int',
                   'description': 'big string'},
-        'keys': {'key': 'string', 'game': 'id', 'platform': 'string', 'price': 'int', 'purchased': 'bool'},
+        'keys': {'key': 'string', 'game': 'id', 'platform': 'string', 'price': 'int'},
         'users': {'name': 'string', 'password': 'string', 'is_admin': 'bool'}
     }
     delete_data = {
@@ -108,7 +108,7 @@ def main():
         elif date_or_datetime == 'datetime':
             res_string = date_string.strftime('%d.%m.%Y %H:%M')
         else:
-            raise Exception('Bad info for timestampz_to_string func')
+            raise Exception('Bad info for timestamptz_to_string func')
         return res_string
 
     def pay_the_game():
@@ -355,8 +355,6 @@ def main():
 
     @exit_check
     def get_game_name(message):
-        global user_id
-        user_id = message.from_user.id
         try:
             game_id = dbwork.select_one_value('games', 'id', key='name', key_value=message.text)
         except:
@@ -386,8 +384,8 @@ def main():
         try:
             platform = call.data.split('-')[1]
             key_id = list(not_purchased_keys.keys())[list(not_purchased_keys.values()).index(platform)]
+            dbwork.insert('orders', 'buyer, key', [users_data[call.from_user.id]['id'], key_id])
             dbwork.update('keys', ['purchased'], ['true'], 'id', key_id)
-            dbwork.insert('orders', 'buyer, key', [users_data[user_id]['id'], key_id])
         except:
             bot.send_message(call.message.chat.id,
                              'При оформлении заказа произошла ошибка, попробуйте сделать запрос позже')
@@ -436,19 +434,24 @@ def main():
 
         names_instead_ids = insert_data[table][1]
         for col in names_instead_ids.keys():
-            insert_input_data[col] = dbwork.select_one_value(names_instead_ids[col][0], names_instead_ids[col][1],
-                                                             names_instead_ids[col][2], insert_input_data[col])
+            try:
+                insert_input_data[col] = dbwork.select_one_value(names_instead_ids[col][0], names_instead_ids[col][1],
+                                                                 names_instead_ids[col][2], insert_input_data[col])
+            except TypeError:
+                bot.send_message(message.chat.id, 'Данные не соответсвуют данным из других таблиц, '
+                                                  'перепроверьте данные')
+
         if table == 'games':
             bot.send_message(message.chat.id, 'Введите описание для игры')
             bot.register_next_step_handler_by_chat_id(message.chat.id, get_insert_game_description)
         else:
-            end_insert_db(message.chat.id)
+            end_insert_db(message.chat.id, message.from_user.id)
 
     def get_insert_game_description(message):
         insert_input_data.append(message.text)
-        end_insert_db(message.chat.id)
+        end_insert_db(message.chat.id, message.from_user.id)
 
-    def end_insert_db(chat_id):
+    def end_insert_db(chat_id, user_id):
         try:
             col = insert_data[table][2]
             dbwork.insert(table, col, insert_input_data)
@@ -456,6 +459,7 @@ def main():
             bot.send_message(chat_id, 'Что-то пошло не так, повторите запрос позже')
         else:
             bot.send_message(chat_id, 'Данные успешно добавлены')
+        output_tables_kb(user_id, chat_id)
 
     # Ветка изменения данных в БД
     @exit_check
@@ -517,20 +521,21 @@ def main():
             bot.send_message(message.chat.id, 'Введите описание игры')
             bot.register_next_step_handler_by_chat_id(message.chat.id, get_update_game_description)
         else:
-            end_update_db(message.chat.id)
+            end_update_db(message.chat.id, message.from_user.id)
 
     def get_update_game_description(message):
         update_columns.append('description')
         update_input_data.append(message.text)
-        end_update_db(message.chat.id)
+        end_update_db(message.chat.id, message.from_user.id)
 
-    def end_update_db(chat_id):
+    def end_update_db(chat_id, user_id):
         try:
             dbwork.update(table, update_columns, update_input_data, 'id', update_id)
         except:
             bot.send_message(chat_id, 'Что-то пошло не так, повторите запрос позже')
         else:
             bot.send_message(chat_id, 'Данные успешно добавлены')
+        output_tables_kb(user_id, chat_id)
 
     # Ветка удаления данных из БД
     @exit_check
@@ -558,6 +563,7 @@ def main():
 
     def delete_entry(message):
         if message.text == 'Нет':
+            output_tables_kb(message.from_user.id, message.chat.id)
             return
         try:
             dbwork.delete(table, 'id', delete_id)
