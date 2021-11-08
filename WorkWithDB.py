@@ -1,7 +1,7 @@
 import psycopg2
 
 
-class WWDB():
+class WWDB:
     def __init__(self, user, password, host, port, database):  # метод чтения БД и создания курсора
         self.conn = psycopg2.connect(user=user,
                                      password=password,
@@ -10,7 +10,7 @@ class WWDB():
                                      database=database)
         self.curs = self.conn.cursor()  # курсор
 
-    def select_many_rows(self, table, columns=('*'), **kwargs):
+    def select_many_rows(self, table, columns='*', **kwargs):
         """
         This function get many rows from needed table
         key='true', key_value='true', order_by = 'true'
@@ -71,7 +71,7 @@ class WWDB():
             self.conn.rollback()
             raise Exception('Insert was non successful')
 
-    def update(self, table, columns, values, key, key_value, crypt_columns=[]):
+    def update(self, table, columns, values, key, key_value, crypt_columns=None):
         column_value_ratio_string = ''
         for i in range(len(columns)):
             values[i] = f"'{values[i]}'"
@@ -98,8 +98,8 @@ class WWDB():
             self.conn.rollback()
             raise Exception('Delete was non successful')
 
-    def get_crypt_value(self, str):
-        command_string = f"select md5('{str}')"
+    def get_crypt_value(self, data):
+        command_string = f"select md5('{data}')"
         command = self.curs.mogrify(command_string)
         self.curs.execute(command)
         return self.curs.fetchone()[0]

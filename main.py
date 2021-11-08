@@ -76,7 +76,7 @@ def main():
 
     def exit_check(func):
         def wrapped(message):
-            if (message.text == '/exit'):
+            if message.text == '/exit':
                 bot.send_message(message.chat.id, 'Операция прервана')
                 output_tables_kb(message.from_user.id, message.chat.id)
                 raise Exception('Quit from function, all is OK')
@@ -112,8 +112,8 @@ def main():
         return res_string
 
     def pay_the_game():
-        return 'Подключить оплату в этого бота я не могу, потому что это будет мошенничество, но заказ на ваш аккаунт ' \
-               'добавить можно'
+        return 'Подключить оплату в этого бота я не могу, потому что это будет мошенничество, но заказ на ваш аккаунт' \
+               ' добавить можно'
 
     def for_admin(func):
         def wrapped(data):
@@ -128,16 +128,6 @@ def main():
                 raise Exception('This command not for common users')
 
         return wrapped
-
-    def string_datetime_to_datetime(string, date_or_datetime):
-        dttime = datetime()
-        if date_or_datetime == 'date':
-            dttime.year, dttime.month, dttime.day = string.split('.')
-        elif date_or_datetime == 'datetime':
-            date, time = string.split(' ')
-            dttime.year, dttime.month, dttime.day = date.split('.')
-            dttime.hour, dttime.minute = time.splite(':')
-        return dttime
 
     def get_data_for_output_table(table, columns, order_by, foreign_keys, admin_check, **kwargs):
         # Получение всех данных данных из бд для тела таблицы
@@ -279,8 +269,8 @@ def main():
         if table == 'orders' and not is_admin(message.from_user.id, message.chat.id):
             try:
                 body = get_data_for_output_table(table, columns, order_by, foreign_keys,
-                                          is_admin(message.from_user.id, message.chat.id),
-                                          key='buyer', key_value=users_data[message.from_user.id]['id'])
+                                                 is_admin(message.from_user.id, message.chat.id),
+                                                 key='buyer', key_value=users_data[message.from_user.id]['id'])
             except ValueError:
                 return bot.send_message(message.chat.id,
                                         'У вас нет заказов, нужно это исправить',
