@@ -36,6 +36,11 @@ make_order_inline_kb = types.InlineKeyboardMarkup()
 make_order_inline_btn = types.InlineKeyboardButton('Сделать заказ!', callback_data="make_order")
 make_order_inline_kb.add(make_order_inline_btn)
 
+yes_no_kb = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+yes_btn = types.KeyboardButton('Да')
+no_btn = types.KeyboardButton('Нет')
+yes_no_kb.add(yes_btn, no_btn)
+
 
 def tables_paginator(pages, page, table):
     table = table.capitalize()
@@ -59,6 +64,6 @@ def make_inline_kb(kb_name, btns_names_array):
 
 def make_change_db_inline_btns(table):
     insert_inline_btn = types.InlineKeyboardButton('Добавить', callback_data=f'Insert-{table}')
-    update_inline_btn = types.InlineKeyboardButton('Изменть', callback_data=f'Update-{table}')
+    update_inline_btn = types.InlineKeyboardButton('Изменить', callback_data=f'Update-{table}')
     delete_inline_btn = types.InlineKeyboardButton('Удалить', callback_data=f'Delete-{table}')
     return insert_inline_btn, update_inline_btn, delete_inline_btn

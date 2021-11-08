@@ -25,14 +25,14 @@ CREATE TABLE Keys(
     game INTEGER,
     platform VARCHAR(50),
     price INTEGER,
-    purchased BOOL,
+    purchased BOOL default false,
     FOREIGN KEY(game) REFERENCES Games(id) ON UPDATE CASCADE ON DELETE NO ACTION
 );
 CREATE TABLE Users(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name VARCHAR(50) UNIQUE,
-    password VARCHAR(50),
-    is_admin BOOL
+    password TEXT,
+    is_admin BOOL default false
 );
 CREATE TABLE Orders(
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
